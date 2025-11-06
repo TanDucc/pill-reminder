@@ -6,6 +6,7 @@ import 'screens/profile_screen.dart';
 import 'screens/login_screen.dart';
 import 'screens/register_screen.dart';
 import 'screens/splash_screen.dart';
+import 'screens/wifi_config_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -54,6 +55,7 @@ class _MainScreenState extends State<MainScreen> {
     const AddMedicineScreen(),
     const CalendarScreen(),
     const ProfileScreen(),
+    const WifiConfigScreen(),
   ];
 
   @override
@@ -72,6 +74,10 @@ class _MainScreenState extends State<MainScreen> {
             _selectedIndex = index;
           });
         },
+        selectedItemColor: Theme.of(context).colorScheme.primary,
+        unselectedItemColor: Colors.grey,
+        backgroundColor: Colors.white,
+        type: BottomNavigationBarType.fixed,
         items: const [
           BottomNavigationBarItem(
             icon: Icon(Icons.medical_services),
@@ -84,6 +90,10 @@ class _MainScreenState extends State<MainScreen> {
           BottomNavigationBarItem(
             icon: Icon(Icons.person),
             label: 'Hồ sơ',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.wifi),
+            label: 'Cấu hình WiFi',
           ),
         ],
       ),

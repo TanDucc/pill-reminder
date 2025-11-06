@@ -14,25 +14,84 @@ class _AddMedicineScreenState extends State<AddMedicineScreen> {
   TimeOfDay? _noonTime;
   TimeOfDay? _eveningTime;
   DateTime _selectedDate = DateTime.now();
+  final TextEditingController _medicineController = TextEditingController();
 
+  @override
+  void initState() {
+    super.initState();
+    _loadTimesForDate(_selectedDate);
+  }
+
+  /// 🔹 Hàm tải giờ từ Firestore
+  Future<void> _loadTimesForDate(DateTime date) async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return;
+
+    final docRef = FirebaseFirestore.instance
+        .collection('medicine_times')
+        .doc(user.uid)
+        .collection('days')
+        .doc(date.toIso8601String().substring(0, 10));
+
+    final doc = await docRef.get();
+    if (doc.exists) {
+      final data = doc.data() ?? {};
+      _medicineController.text = data['medicine'] ?? '';
+
+      setState(() {
+        _morningTime = (data['morning_hour'] != null && data['morning_minute'] != null)
+            ? TimeOfDay(hour: data['morning_hour'], minute: data['morning_minute'])
+            : null;
+        _noonTime = (data['noon_hour'] != null && data['noon_minute'] != null)
+            ? TimeOfDay(hour: data['noon_hour'], minute: data['noon_minute'])
+            : null;
+        _eveningTime = (data['evening_hour'] != null && data['evening_minute'] != null)
+            ? TimeOfDay(hour: data['evening_hour'], minute: data['evening_minute'])
+            : null;
+      });
+    } else {
+      _medicineController.text = '';
+      setState(() {
+        _morningTime = null;
+        _noonTime = null;
+        _eveningTime = null;
+      });
+    }
+  }
+
+  /// 🔹 Hàm lưu giờ vào Firestore
   Future<void> _saveTimes() async {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) return;
+
     final docRef = FirebaseFirestore.instance
         .collection('medicine_times')
         .doc(user.uid)
         .collection('days')
         .doc(_selectedDate.toIso8601String().substring(0, 10));
+
     await docRef.set({
-      'morning': _morningTime != null ? _morningTime!.format(context) : null,
-      'noon': _noonTime != null ? _noonTime!.format(context) : null,
-      'evening': _eveningTime != null ? _eveningTime!.format(context) : null,
+      'medicine': _medicineController.text.trim(),
+      'morning_hour': _morningTime?.hour,
+      'morning_minute': _morningTime?.minute,
+      'noon_hour': _noonTime?.hour,
+      'noon_minute': _noonTime?.minute,
+      'evening_hour': _eveningTime?.hour,
+      'evening_minute': _eveningTime?.minute,
       'date': _selectedDate.toIso8601String().substring(0, 10),
       'createdAt': FieldValue.serverTimestamp(),
     });
+
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Đã lưu giờ uống thuốc!')),
+      const SnackBar(content: Text('✅ Đã lưu giờ uống thuốc!')),
     );
+  }
+
+  /// 🔹 Định dạng giờ
+  String _formatTime(TimeOfDay time) {
+    final hour = time.hour.toString().padLeft(2, '0');
+    final minute = time.minute.toString().padLeft(2, '0');
+    return '$hour:$minute';
   }
 
   @override
@@ -47,6 +106,18 @@ class _AddMedicineScreenState extends State<AddMedicineScreen> {
             style: Theme.of(context).textTheme.headlineSmall,
           ),
           const SizedBox(height: 20),
+
+          /// Nhập loại thuốc
+          TextField(
+            controller: _medicineController,
+            decoration: const InputDecoration(
+              labelText: 'Loại thuốc dùng trong ngày',
+              border: OutlineInputBorder(),
+            ),
+          ),
+          const SizedBox(height: 20),
+
+          /// Chọn ngày
           Row(
             children: [
               const Text('Chọn ngày: '),
@@ -62,6 +133,7 @@ class _AddMedicineScreenState extends State<AddMedicineScreen> {
                     setState(() {
                       _selectedDate = picked;
                     });
+                    await _loadTimesForDate(picked);
                   }
                 },
                 child: Text(
@@ -69,33 +141,39 @@ class _AddMedicineScreenState extends State<AddMedicineScreen> {
               ),
             ],
           ),
+
+          /// Giờ uống buổi sáng
           _buildTimeSection('Buổi sáng', _morningTime, (time) {
-            setState(() {
-              _morningTime = time;
-            });
+            setState(() => _morningTime = time);
           }),
           const SizedBox(height: 16),
+
+          /// Giờ uống buổi trưa
           _buildTimeSection('Buổi trưa', _noonTime, (time) {
-            setState(() {
-              _noonTime = time;
-            });
+            setState(() => _noonTime = time);
           }),
           const SizedBox(height: 16),
+
+          /// Giờ uống buổi tối
           _buildTimeSection('Buổi tối', _eveningTime, (time) {
-            setState(() {
-              _eveningTime = time;
-            });
+            setState(() => _eveningTime = time);
           }),
           const SizedBox(height: 24),
+
+          /// Nút lưu
           ElevatedButton(
             onPressed: _saveTimes,
-            child: const Text('Lưu giờ uống thuốc'),
+            style: ElevatedButton.styleFrom(
+              minimumSize: const Size.fromHeight(48),
+            ),
+            child: const Text('💾 Lưu giờ uống thuốc'),
           ),
         ],
       ),
     );
   }
 
+  /// 🔹 Widget chọn giờ (đã bỏ phần hiển thị giờ bên cạnh)
   Widget _buildTimeSection(
       String title, TimeOfDay? time, Function(TimeOfDay) onTimePicked) {
     return Card(
@@ -107,10 +185,7 @@ class _AddMedicineScreenState extends State<AddMedicineScreen> {
           children: [
             Text(
               title,
-              style: const TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-              ),
+              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 10),
             Row(
@@ -127,8 +202,9 @@ class _AddMedicineScreenState extends State<AddMedicineScreen> {
                       onTimePicked(picked);
                     }
                   },
-                  child: Text(
-                      time != null ? time.format(context) : 'Chọn giờ'),
+                  child: Text(time != null
+                      ? _formatTime(time)
+                      : 'Chọn giờ'),
                 ),
               ],
             ),
