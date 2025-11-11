@@ -1,7 +1,16 @@
+// dart
 import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 class ProfileScreen extends StatelessWidget {
   const ProfileScreen({super.key});
+
+  Future<void> _signOut(BuildContext context) async {
+    await FirebaseAuth.instance.signOut();
+    if (context.mounted) {
+      Navigator.pushReplacementNamed(context, '/login');
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -32,6 +41,15 @@ class ProfileScreen extends StatelessWidget {
           _buildInfoCard('Số điện thoại', '0123456789'),
           const SizedBox(height: 10),
           _buildInfoCard('Email', 'example@email.com'),
+          const SizedBox(height: 24),
+          ElevatedButton.icon(
+            onPressed: () => _signOut(context),
+            icon: const Icon(Icons.logout),
+            label: const Text('Đăng xuất'),
+            style: ElevatedButton.styleFrom(
+              minimumSize: const Size.fromHeight(48),
+            ),
+          ),
         ],
       ),
     );
