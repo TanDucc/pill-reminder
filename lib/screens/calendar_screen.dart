@@ -1,4 +1,3 @@
-// dart
 import 'package:flutter/material.dart';
 import 'package:table_calendar/table_calendar.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -18,11 +17,31 @@ class _CalendarScreenState extends State<CalendarScreen> {
   Map<String, dynamic>? _dayData;
   bool _loadingDay = false;
 
+  String? _currentUserId;
+  String? _role;
+
   @override
   void initState() {
     super.initState();
     _selectedDay = _focusedDay;
-    _loadTimesForDate(_focusedDay);
+    _initUserAndLoad(_focusedDay);
+  }
+
+  Future<void> _initUserAndLoad(DateTime date) async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return;
+    _currentUserId = user.uid;
+    // load role from users collection (for info only)
+    try {
+      final doc = await FirebaseFirestore.instance.collection('users').doc(user.uid).get();
+      _role = doc.exists ? (doc.data()?['role'] as String? ?? 'user') : 'user';
+    } catch (_) {
+      _role = 'user';
+    }
+    // we always view the current user's calendar
+    // set view id to current user
+    // (no supervisor mode)
+    await _loadTimesForDate(date);
   }
 
   Future<void> _loadTimesForDate(DateTime date) async {
@@ -31,16 +50,19 @@ class _CalendarScreenState extends State<CalendarScreen> {
       _dayData = null;
     });
 
-    final user = FirebaseAuth.instance.currentUser;
-    if (user == null) {
+    final viewer = FirebaseAuth.instance.currentUser;
+    if (viewer == null) {
       setState(() => _loadingDay = false);
       return;
     }
 
+    // always load current user's calendar
+    final uidToLoad = viewer.uid;
+
     final dayId = date.toIso8601String().substring(0, 10);
     final docRef = FirebaseFirestore.instance
         .collection('medicine_times')
-        .doc(user.uid)
+        .doc(uidToLoad)
         .collection('days')
         .doc(dayId);
 

@@ -7,6 +7,7 @@ import 'screens/login_screen.dart';
 import 'screens/register_screen.dart';
 import 'screens/splash_screen.dart';
 import 'screens/wifi_config_screen.dart';
+import 'screens/stats_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -54,6 +55,7 @@ class _MainScreenState extends State<MainScreen> {
   final List<Widget> _screens = [
     const AddMedicineScreen(),
     const CalendarScreen(),
+    const StatsScreen(),
     const ProfileScreen(),
     const WifiConfigScreen(),
   ];
@@ -88,6 +90,10 @@ class _MainScreenState extends State<MainScreen> {
             label: 'Lịch',
           ),
           BottomNavigationBarItem(
+            icon: Icon(Icons.bar_chart),
+            label: 'Thống kê',
+          ),
+          BottomNavigationBarItem(
             icon: Icon(Icons.person),
             label: 'Hồ sơ',
           ),
@@ -100,6 +106,3 @@ class _MainScreenState extends State<MainScreen> {
     );
   }
 }
-
-
-

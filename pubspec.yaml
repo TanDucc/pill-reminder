@@ -41,6 +41,8 @@ dependencies:
   http: ^1.2.3
   firebase_database: ^10.0.0
 
+  # removed fl_chart due to Flutter SDK compatibility issues; using custom painters instead
+
 
 dev_dependencies:
   flutter_test:
