@@ -15,8 +15,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
   final TextEditingController _nameController = TextEditingController();
   final TextEditingController _dobController = TextEditingController();
   final TextEditingController _medicalController = TextEditingController();
+  
   bool _isLoading = false;
   DateTime? _selectedDob;
+  String? _selectedGender;
 
   Future<void> _register() async {
     final email = _emailController.text.trim();
@@ -24,7 +26,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
     final name = _nameController.text.trim();
     final medical = _medicalController.text.trim();
     final dob = _selectedDob;
-    if (email.isEmpty || password.isEmpty || name.isEmpty || dob == null) {
+    if (email.isEmpty || password.isEmpty || name.isEmpty || dob == null || _selectedGender == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Vui lòng nhập đầy đủ thông tin!')),
       );
@@ -46,6 +48,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
         // thêm thông tin cá nhân
         'dob': Timestamp.fromDate(dob),
         'medicalCondition': medical,
+        'gender': _selectedGender,
       });
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -107,6 +110,18 @@ class _RegisterScreenState extends State<RegisterScreen> {
             TextField(
               controller: _nameController,
               decoration: const InputDecoration(labelText: 'Họ và tên'),
+            ),
+            const SizedBox(height: 16),
+            DropdownButtonFormField<String>(
+              decoration: const InputDecoration(labelText: 'Giới tính'),
+              hint: const Text('Chọn giới tính'),
+              value: _selectedGender,
+              items: const [
+                DropdownMenuItem(value: 'Nam', child: Text('Nam')),
+                DropdownMenuItem(value: 'Nữ', child: Text('Nữ')),
+                DropdownMenuItem(value: 'Khác', child: Text('Khác')),
+              ],
+              onChanged: (value) => setState(() => _selectedGender = value),
             ),
             const SizedBox(height: 16),
             TextField(

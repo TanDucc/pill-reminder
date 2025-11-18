@@ -16,8 +16,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
   String? role;
   String? medicalCondition;
   DateTime? dob;
+  String? gender;
   bool _loading = true;
   bool _noUser = false; // new: indicate not authenticated
+  
 
   @override
   void initState() {
@@ -50,6 +52,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
           email = data['email'] as String? ?? user.email ?? '';
           role = data['role'] as String? ?? 'user';
           medicalCondition = data['medicalCondition'] as String? ?? '';
+          gender = data['gender'] as String? ?? '';
           final ts = data['dob'];
           if (ts is Timestamp) {
             dob = ts.toDate();
@@ -63,6 +66,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
           name = user.displayName ?? '';
           email = user.email ?? '';
           role = 'user';
+          gender = '';
+
         });
       }
     } catch (e) {
@@ -135,6 +140,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
             _buildInfoCard('Ngày sinh', dob != null ? '${dob!.day.toString().padLeft(2, '0')}/${dob!.month.toString().padLeft(2, '0')}/${dob!.year}' : 'Không có'),
             const SizedBox(height: 12),
             _buildInfoCard('Bệnh lí', medicalCondition ?? 'Không có'),
+            const SizedBox(height: 12),
+            _buildInfoCard('Giới tính', gender ?? 'Không có'),
             const SizedBox(height: 24),
 
             const Spacer(),
