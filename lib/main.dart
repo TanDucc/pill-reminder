@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:timezone/data/latest_all.dart' as tz;
+import 'package:timezone/timezone.dart' as tz_core;
 import 'screens/add_medicine_screen.dart';
 import 'screens/calendar_screen.dart';
 import 'screens/profile_screen.dart';
@@ -8,10 +10,20 @@ import 'screens/register_screen.dart';
 import 'screens/splash_screen.dart';
 import 'screens/wifi_config_screen.dart';
 import 'screens/stats_screen.dart';
+import 'services/notification_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp();
+
+  // Initialize timezone
+  tz.initializeTimeZones();
+  // Set local timezone (Asia/Ho_Chi_Minh for Vietnam)
+  tz_core.setLocalLocation(tz_core.getLocation('Asia/Ho_Chi_Minh'));
+
+  // Initialize notification service
+  await NotificationService().initialize();
+
   runApp(const MyApp());
 }
 

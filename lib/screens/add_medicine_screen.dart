@@ -3,6 +3,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_database/firebase_database.dart';
 import 'package:firebase_core/firebase_core.dart';
+import '../services/notification_service.dart';
 
 class AddMedicineScreen extends StatefulWidget {
   const AddMedicineScreen({super.key});
@@ -201,14 +202,29 @@ class _AddMedicineScreenState extends State<AddMedicineScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text(_applyToWeek ? '✅ Đã lưu giờ uống thuốc cho 1 tuần!' : '✅ Đã lưu giờ uống thuốc!')),
         );
+        // Schedule notifications if today
+        if (_selectedDate.toIso8601String().substring(0, 10) == DateTime.now().toIso8601String().substring(0, 10)) {
+          print('📅 Selected date is today, scheduling notifications...');
+          await NotificationService().scheduleTodaysNotifications();
+        } else {
+          print('🚫 Selected date is not today, skipping notification schedule');
+        }
       } else if (!firestoreOk && rtdbOk) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('⚠️ Firestore failed, but saved to Realtime DB.\nFirestore error: $firestoreErr')),
         );
+        // Schedule notifications if today
+        if (_selectedDate.toIso8601String().substring(0, 10) == DateTime.now().toIso8601String().substring(0, 10)) {
+          await NotificationService().scheduleTodaysNotifications();
+        }
       } else if (firestoreOk && !rtdbOk) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('⚠️ Saved to Firestore, but Realtime DB failed.\nRTDB error: $rtdbErr')),
         );
+        // Schedule notifications if today
+        if (_selectedDate.toIso8601String().substring(0, 10) == DateTime.now().toIso8601String().substring(0, 10)) {
+          await NotificationService().scheduleTodaysNotifications();
+        }
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('❌ Failed to save to both Firestore and Realtime DB.\nFirestore: $firestoreErr\nRTDB: $rtdbErr')),
@@ -341,6 +357,34 @@ class _AddMedicineScreenState extends State<AddMedicineScreen> {
               minimumSize: const Size.fromHeight(48),
             ),
             child: const Text('💾 Lưu giờ uống thuốc'),
+          ),
+          const SizedBox(height: 16),
+          /// Nút test thông báo ngay lập tức
+          ElevatedButton(
+            onPressed: () async {
+              await NotificationService().showImmediateTestNotification(message: 'Đây là thông báo TEST tức thì!');
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Đã gửi thông báo ngay lập tức!')),
+              );
+            },
+            style: ElevatedButton.styleFrom(
+              minimumSize: const Size.fromHeight(48),
+            ),
+            child: const Text('📢 Test thông báo NGAY'),
+          ),
+          const SizedBox(height: 8),
+          /// Nút test thông báo
+          ElevatedButton(
+            onPressed: () async {
+              await NotificationService().scheduleTestNotification(message: 'Đây là thông báo test để kiểm tra thông báo hoạt động!');
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Đã lập lịch thông báo test trong 2 phút!')),
+              );
+            },
+            style: ElevatedButton.styleFrom(
+              minimumSize: const Size.fromHeight(48),
+            ),
+            child: const Text('🔔 Test thông báo trong 2 phút'),
           ),
         ],
       ),
