@@ -98,13 +98,13 @@ class NotificationService {
     try {
       // Make sure time is in future
       if (notificationTime.isBefore(DateTime.now())) {
-        print('⚠️ Scheduled time is in past, skipping notification');
+        // print('⚠️ Scheduled time is in past, skipping notification');
         return;
       }
 
       // Create TZDateTime properly for zonedSchedule
       final scheduledTZTime = tz_core.TZDateTime.from(notificationTime, tz_core.local);
-      print('🕒 TZ Scheduled time: $scheduledTZTime');
+      // print('🕒 TZ Scheduled time: $scheduledTZTime');
 
       await flutterLocalNotificationsPlugin.zonedSchedule(
         id,
@@ -154,12 +154,12 @@ class NotificationService {
       if (doc.exists) {
         final data = doc.data()!;
         final medicine = data['medicine'] as String? ?? '';
-        print('📄 Medicine data found: $medicine');
-        print('📊 Data: $data');
+        // print('📄 Medicine data found: $medicine');
+        // print('📊 Data: $data');
 
         // Cancel previous notifications first
         await cancelAllNotifications();
-        print('🚮 Cancelled all previous notifications');
+        // print('🚮 Cancelled all previous notifications');
 
         // Schedule morning notification
         if (data['morning_hour'] != null && data['morning_minute'] != null) {

@@ -151,6 +151,35 @@ class _AddMedicineScreenState extends State<AddMedicineScreen> {
           // ignore: avoid_print
           print('Unexpected RTDB error: $rtdbErr');
         }
+
+        // Đặt lịch thông báo cho từng ngày trong 7 ngày
+        for (int i = 0; i < 7; i++) {
+          final day = _selectedDate.add(Duration(days: i));
+          final dayId = day.toIso8601String().substring(0, 10);
+          final docRef = FirebaseFirestore.instance
+              .collection('medicine_times')
+              .doc(uid)
+              .collection('days')
+              .doc(dayId);
+          final doc = await docRef.get();
+          if (doc.exists) {
+            final data = doc.data() ?? {};
+            final nowDateId = DateTime.now().toIso8601String().substring(0, 10);
+            if (dayId.compareTo(nowDateId) >= 0) {
+              print('--- Đặt lịch thông báo cho ngày $dayId ---');
+              print('Loại thuốc: ${data['medicine'] ?? ''}');
+              print('Sáng: ${data['morning_hour'] ?? '--'}:${data['morning_minute'] ?? '--'}');
+              print('Trưa: ${data['noon_hour'] ?? '--'}:${data['noon_minute'] ?? '--'}');
+              print('Tối: ${data['evening_hour'] ?? '--'}:${data['evening_minute'] ?? '--'}');
+              await NotificationService().scheduleTodaysNotifications(uid: uid);
+              print('✅ Đã xếp lịch thông báo cho ngày $dayId');
+            } else {
+              print('⏩ Bỏ qua ngày $dayId (trước hôm nay)');
+            }
+          } else {
+            print('❌ Không tìm thấy dữ liệu cho ngày $dayId');
+          }
+        }
       } else {
         final dayId = _selectedDate.toIso8601String().substring(0, 10);
         final docRef = FirebaseFirestore.instance
