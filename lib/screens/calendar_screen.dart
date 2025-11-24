@@ -4,7 +4,9 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 class CalendarScreen extends StatefulWidget {
-  const CalendarScreen({super.key});
+  final ValueNotifier<int>? selectedIndexNotifier;
+
+  const CalendarScreen({required this.selectedIndexNotifier, super.key});
 
   @override
   State<CalendarScreen> createState() => _CalendarScreenState();

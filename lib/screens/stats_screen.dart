@@ -100,7 +100,9 @@ class _PieChartPainter extends CustomPainter {
 }
 
 class StatsScreen extends StatefulWidget {
-  const StatsScreen({super.key});
+  final ValueNotifier<int>? selectedIndexNotifier;
+
+  const StatsScreen({required this.selectedIndexNotifier, super.key});
 
   @override
   State<StatsScreen> createState() => _StatsScreenState();

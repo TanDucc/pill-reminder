@@ -4,7 +4,9 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 class ProfileScreen extends StatefulWidget {
-  const ProfileScreen({super.key});
+  final ValueNotifier<int>? selectedIndexNotifier;
+
+  const ProfileScreen({required this.selectedIndexNotifier, super.key});
 
   @override
   State<ProfileScreen> createState() => _ProfileScreenState();
@@ -84,6 +86,31 @@ class _ProfileScreenState extends State<ProfileScreen> {
     await FirebaseAuth.instance.signOut();
     if (context.mounted) {
       Navigator.pushReplacementNamed(context, '/login');
+    }
+  }
+
+  Future<void> _resetPassword() async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user?.email == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Không tìm thấy email để đặt lại mật khẩu')),
+      );
+      return;
+    }
+
+    try {
+      await FirebaseAuth.instance.sendPasswordResetEmail(email: user!.email!);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Email đặt lại mật khẩu đã được gửi')),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Lỗi gửi email: $e')),
+        );
+      }
     }
   }
 
@@ -212,9 +239,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             leading: const Icon(Icons.medication, color: Colors.teal),
                             title: const Text('Lịch sử uống thuốc'),
                             subtitle: const Text('Xem lại các ngày đã uống thuốc'),
-                            onTap: () {
-                              // TODO: Chuyển sang màn hình lịch sử
-                            },
+                            onTap: () => widget.selectedIndexNotifier?.value = 1,
                           ),
                           const Divider(),
                           ListTile(
@@ -224,6 +249,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             onTap: () {
                               // TODO: Chuyển sang màn hình cài đặt
                             },
+                          ),
+                          const Divider(),
+                          ListTile(
+                            leading: const Icon(Icons.lock_reset, color: Colors.teal),
+                            title: const Text('Quên mật khẩu'),
+                            subtitle: const Text('Gửi email đặt lại mật khẩu'),
+                            onTap: _resetPassword,
                           ),
                         ],
                       ),

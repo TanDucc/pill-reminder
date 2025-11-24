@@ -29,16 +29,55 @@ class _SplashScreenState extends State<SplashScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: const [
-            FlutterLogo(size: 80),
-            SizedBox(height: 24),
-            CircularProgressIndicator(),
-            SizedBox(height: 16),
-            Text('Đang tải ứng dụng...', style: TextStyle(fontSize: 18)),
-          ],
+      body: Container(
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            colors: [Color(0xFF1E88E5), Color(0xFF42A5F5)],
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+          ),
+        ),
+        child: Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(16.0),
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.12),
+                  shape: BoxShape.circle,
+                ),
+                child: const CircleAvatar(
+                  radius: 36,
+                  backgroundColor: Colors.white,
+                  child: Icon(
+                    Icons.medication,
+                    size: 40,
+                    color: Color(0xFF1E88E5),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
+              const Text(
+                'Pill Reminder',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 24,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const SizedBox(height: 32),
+              const CircularProgressIndicator(),
+              const SizedBox(height: 16),
+              const Text(
+                'Đang tải ứng dụng...',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 16,
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );

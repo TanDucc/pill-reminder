@@ -63,12 +63,28 @@ class MainScreen extends StatefulWidget {
 
 class _MainScreenState extends State<MainScreen> {
   int _selectedIndex = 0;
+  late final ValueNotifier<int> selectedIndexNotifier;
 
-  final List<Widget> _screens = [
+  @override
+  void initState() {
+    super.initState();
+    selectedIndexNotifier = ValueNotifier<int>(0);
+    selectedIndexNotifier.addListener(_onTabChanged);
+  }
+
+  void _onTabChanged() {
+    if (_selectedIndex != selectedIndexNotifier.value) {
+      setState(() {
+        _selectedIndex = selectedIndexNotifier.value;
+      });
+    }
+  }
+
+  late final List<Widget> _screens = [
     const AddMedicineScreen(),
-    const CalendarScreen(),
-    const StatsScreen(),
-    const ProfileScreen(),
+    CalendarScreen(selectedIndexNotifier: selectedIndexNotifier),
+    StatsScreen(selectedIndexNotifier: selectedIndexNotifier),
+    ProfileScreen(selectedIndexNotifier: selectedIndexNotifier),
     const WifiConfigScreen(),
   ];
 
@@ -84,9 +100,7 @@ class _MainScreenState extends State<MainScreen> {
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: _selectedIndex,
         onTap: (index) {
-          setState(() {
-            _selectedIndex = index;
-          });
+          selectedIndexNotifier.value = index;
         },
         selectedItemColor: Theme.of(context).colorScheme.primary,
         unselectedItemColor: Colors.grey,
