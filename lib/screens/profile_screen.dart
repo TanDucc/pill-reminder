@@ -16,7 +16,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
   String? name;
   String? email;
   String? role;
-  String? medicalCondition;
   DateTime? dob;
   String? gender;
   bool _loading = true;
@@ -53,7 +52,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
           name = data['name'] as String? ?? '';
           email = data['email'] as String? ?? user.email ?? '';
           role = data['role'] as String? ?? 'user';
-          medicalCondition = data['medicalCondition'] as String? ?? '';
           gender = data['gender'] as String? ?? '';
           final ts = data['dob'];
           if (ts is Timestamp) {
@@ -196,14 +194,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                 dob != null ? '${dob!.day.toString().padLeft(2, '0')}/${dob!.month.toString().padLeft(2, '0')}/${dob!.year}' : '',
                                 style: const TextStyle(fontSize: 16),
                               ),
-                            ],
-                          ),
-                          const SizedBox(height: 12),
-                          Row(
-                            children: [
-                              const Icon(Icons.local_hospital, color: Colors.teal),
-                              const SizedBox(width: 8),
-                              Text(medicalCondition ?? '', style: const TextStyle(fontSize: 16)),
                             ],
                           ),
                           const SizedBox(height: 12),

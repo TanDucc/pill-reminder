@@ -14,7 +14,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
   final TextEditingController _passwordController = TextEditingController();
   final TextEditingController _nameController = TextEditingController();
   final TextEditingController _dobController = TextEditingController();
-  final TextEditingController _medicalController = TextEditingController();
   
   bool _isLoading = false;
   DateTime? _selectedDob;
@@ -24,7 +23,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
     final email = _emailController.text.trim();
     final password = _passwordController.text.trim();
     final name = _nameController.text.trim();
-    final medical = _medicalController.text.trim();
     final dob = _selectedDob;
     if (email.isEmpty || password.isEmpty || name.isEmpty || dob == null || _selectedGender == null) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -47,7 +45,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
         'role': 'user',
         // thêm thông tin cá nhân
         'dob': Timestamp.fromDate(dob),
-        'medicalCondition': medical,
         'gender': _selectedGender,
       });
       if (mounted) {
@@ -129,11 +126,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
               decoration: const InputDecoration(labelText: 'Ngày sinh'),
               readOnly: true,
               onTap: _pickDob,
-            ),
-            const SizedBox(height: 16),
-            TextField(
-              controller: _medicalController,
-              decoration: const InputDecoration(labelText: 'Bệnh lí (nếu có)'),
             ),
             const SizedBox(height: 16),
             TextField(

@@ -18,6 +18,7 @@ class _AddMedicineScreenState extends State<AddMedicineScreen> {
   TimeOfDay? _eveningTime;
   DateTime _selectedDate = DateTime.now();
   final TextEditingController _medicineController = TextEditingController();
+  final TextEditingController _diseaseController = TextEditingController();
   bool _applyToWeek = false; // ...new: whether to apply times for 1 week
   final DatabaseReference _rtdb = FirebaseDatabase.instanceFor(
     app: Firebase.app(),
@@ -45,6 +46,7 @@ class _AddMedicineScreenState extends State<AddMedicineScreen> {
     if (doc.exists) {
       final data = doc.data() ?? {};
       _medicineController.text = data['medicine'] ?? '';
+      _diseaseController.text = data['disease'] ?? '';
 
       setState(() {
         _morningTime = (data['morning_hour'] != null && data['morning_minute'] != null)
@@ -59,6 +61,7 @@ class _AddMedicineScreenState extends State<AddMedicineScreen> {
       });
     } else {
       _medicineController.text = '';
+      _diseaseController.text = '';
       setState(() {
         _morningTime = null;
         _noonTime = null;
@@ -81,6 +84,7 @@ class _AddMedicineScreenState extends State<AddMedicineScreen> {
     // Prepare the data payload (same structure for Firestore & RTDB)
     Map<String, dynamic> makePayload(DateTime day) => {
           'medicine': _medicineController.text.trim(),
+          'disease': _diseaseController.text.trim(),
           'morning_hour': _morningTime?.hour,
           'morning_minute': _morningTime?.minute,
           'noon_hour': _noonTime?.hour,
@@ -322,6 +326,15 @@ class _AddMedicineScreenState extends State<AddMedicineScreen> {
             controller: _medicineController,
             decoration: const InputDecoration(
               labelText: 'Loại thuốc dùng trong ngày',
+              border: OutlineInputBorder(),
+            ),
+          ),
+          const SizedBox(height: 16),
+          /// Nhập loại bệnh
+          TextField(
+            controller: _diseaseController,
+            decoration: const InputDecoration(
+              labelText: 'Loại bệnh (nếu có)',
               border: OutlineInputBorder(),
             ),
           ),
