@@ -81,6 +81,45 @@ class _AddMedicineScreenState extends State<AddMedicineScreen> {
     // ignore: avoid_print
     print('Attempting to save medicine times for uid: $uid');
 
+    // Fetch user data from Firestore
+    Map<String, dynamic> userData = {};
+    try {
+      final userDoc = await FirebaseFirestore.instance.collection('users').doc(uid).get();
+      if (userDoc.exists) {
+        final data = userDoc.data()!;
+        final name = data['name'] as String? ?? '';
+        final gender = data['gender'] as String? ?? '';
+        int? age;
+        final dobTs = data['dob'];
+        if (dobTs is Timestamp) {
+          final dob = dobTs.toDate();
+          age = DateTime.now().year - dob.year;
+        }
+        userData = {
+          'user_name': name,
+          'user_id': uid,
+          'user_gender': gender,
+          'user_age': age,
+        };
+      } else {
+        userData = {
+          'user_name': user.displayName ?? '',
+          'user_id': uid,
+          'user_gender': '',
+          'user_age': null,
+        };
+      }
+    } catch (e) {
+      // ignore: avoid_print
+      print('Error fetching user data: $e');
+      userData = {
+        'user_name': user.displayName ?? '',
+        'user_id': uid,
+        'user_gender': '',
+        'user_age': null,
+      };
+    }
+
     // Prepare the data payload (same structure for Firestore & RTDB)
     Map<String, dynamic> makePayload(DateTime day) => {
           'medicine': _medicineController.text.trim(),
@@ -93,6 +132,7 @@ class _AddMedicineScreenState extends State<AddMedicineScreen> {
           'evening_minute': _eveningTime?.minute,
           'date': day.toIso8601String().substring(0, 10),
           'createdAt': ServerValue.timestamp,
+          ...userData,
         };
 
     bool firestoreOk = true;
