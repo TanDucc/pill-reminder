@@ -16,6 +16,9 @@ class _AddMedicineScreenState extends State<AddMedicineScreen> {
   TimeOfDay? _morningTime;
   TimeOfDay? _noonTime;
   TimeOfDay? _eveningTime;
+  TimeOfDay? _esp32MorningTime;
+  TimeOfDay? _esp32NoonTime;
+  TimeOfDay? _esp32EveningTime;
   DateTime _selectedDate = DateTime.now();
   final TextEditingController _medicineController = TextEditingController();
   final TextEditingController _diseaseController = TextEditingController();
@@ -58,6 +61,15 @@ class _AddMedicineScreenState extends State<AddMedicineScreen> {
         _eveningTime = (data['evening_hour'] != null && data['evening_minute'] != null)
             ? TimeOfDay(hour: data['evening_hour'], minute: data['evening_minute'])
             : null;
+        _esp32MorningTime = (data['esp32_morning_hour'] != null && data['esp32_morning_minute'] != null)
+            ? TimeOfDay(hour: data['esp32_morning_hour'], minute: data['esp32_morning_minute'])
+            : null;
+        _esp32NoonTime = (data['esp32_noon_hour'] != null && data['esp32_noon_minute'] != null)
+            ? TimeOfDay(hour: data['esp32_noon_hour'], minute: data['esp32_noon_minute'])
+            : null;
+        _esp32EveningTime = (data['esp32_evening_hour'] != null && data['esp32_evening_minute'] != null)
+            ? TimeOfDay(hour: data['esp32_evening_hour'], minute: data['esp32_evening_minute'])
+            : null;
       });
     } else {
       _medicineController.text = '';
@@ -66,6 +78,9 @@ class _AddMedicineScreenState extends State<AddMedicineScreen> {
         _morningTime = null;
         _noonTime = null;
         _eveningTime = null;
+        _esp32MorningTime = null;
+        _esp32NoonTime = null;
+        _esp32EveningTime = null;
       });
     }
   }
@@ -415,33 +430,112 @@ class _AddMedicineScreenState extends State<AddMedicineScreen> {
           ),
 
           /// Giờ uống buổi sáng
-          _buildTimeSection('Buổi sáng', _morningTime, (time) {
-            setState(() => _morningTime = time);
-          }),
-          const SizedBox(height: 16),
+          Card(
+            margin: const EdgeInsets.symmetric(vertical: 8),
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _buildTimeSection('Buổi sáng', _morningTime, (time) {
+                    setState(() => _morningTime = time);
+                  }),
+                  if (_esp32MorningTime != null)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 8),
+                      child: Text(
+                        'Đã mở hộp thuốc vào lúc ${_formatTime(_esp32MorningTime!)}',
+                        style: const TextStyle(color: Colors.green, fontSize: 14, fontWeight: FontWeight.w500),
+                        textAlign: TextAlign.center,
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          ),
 
           /// Giờ uống buổi trưa
-          _buildTimeSection('Buổi trưa', _noonTime, (time) {
-            setState(() => _noonTime = time);
-          }),
-          const SizedBox(height: 16),
+          Card(
+            margin: const EdgeInsets.symmetric(vertical: 8),
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _buildTimeSection('Buổi trưa', _noonTime, (time) {
+                    setState(() => _noonTime = time);
+                  }),
+                  if (_esp32NoonTime != null)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 8),
+                      child: Text(
+                        'Đã mở hộp thuốc vào lúc ${_formatTime(_esp32NoonTime!)}',
+                        style: const TextStyle(color: Colors.green, fontSize: 14, fontWeight: FontWeight.w500),
+                        textAlign: TextAlign.center,
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          ),
 
           /// Giờ uống buổi tối
-          _buildTimeSection('Buổi tối', _eveningTime, (time) {
-            setState(() => _eveningTime = time);
-          }),
+          Card(
+            margin: const EdgeInsets.symmetric(vertical: 8),
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _buildTimeSection('Buổi tối', _eveningTime, (time) {
+                    setState(() => _eveningTime = time);
+                  }),
+                  if (_esp32EveningTime != null)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 8),
+                      child: Text(
+                        'Đã mở hộp thuốc vào lúc ${_formatTime(_esp32EveningTime!)}',
+                        style: const TextStyle(color: Colors.green, fontSize: 14, fontWeight: FontWeight.w500),
+                        textAlign: TextAlign.center,
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          ),
           const SizedBox(height: 24),
 
           /// Nút lưu
-          ElevatedButton(
-            onPressed: _saveTimes,
-            style: ElevatedButton.styleFrom(
-              minimumSize: const Size.fromHeight(48),
+          Container(
+            width: double.infinity,
+            margin: const EdgeInsets.symmetric(vertical: 16),
+            child: ElevatedButton(
+              onPressed: _saveTimes,
+              style: ElevatedButton.styleFrom(
+                minimumSize: const Size.fromHeight(56),
+                backgroundColor: Theme.of(context).colorScheme.primary,
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                elevation: 4,
+                shadowColor: Theme.of(context).colorScheme.primary.withOpacity(0.3),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: const [
+                  Icon(Icons.save, color: Colors.white),
+                  SizedBox(width: 8),
+                  Text(
+                    'Lưu giờ uống thuốc',
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                  ),
+                ],
+              ),
             ),
-            child: const Text('💾 Lưu giờ uống thuốc'),
           ),
-          const SizedBox(height: 16),
-          /// Nút test thông báo ngay lập tức
+
+          /* /// Nút test thông báo ngay lập tức
           ElevatedButton(
             onPressed: () async {
               await NotificationService().showImmediateTestNotification(message: 'Đây là thông báo TEST tức thì!');
@@ -454,8 +548,8 @@ class _AddMedicineScreenState extends State<AddMedicineScreen> {
             ),
             child: const Text('📢 Test thông báo NGAY'),
           ),
-          const SizedBox(height: 8),
-          /// Nút test thông báo
+          */ const SizedBox(height: 8),
+          /* /// Nút test thông báo
           ElevatedButton(
             onPressed: () async {
               await NotificationService().scheduleTestNotification(message: 'Đây là thông báo test để kiểm tra thông báo hoạt động!');
@@ -467,7 +561,7 @@ class _AddMedicineScreenState extends State<AddMedicineScreen> {
               minimumSize: const Size.fromHeight(48),
             ),
             child: const Text('🔔 Test thông báo trong 2 phút'),
-          ),
+          ), */
         ],
       ),
     );

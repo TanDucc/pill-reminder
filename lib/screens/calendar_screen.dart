@@ -107,6 +107,10 @@ class _CalendarScreenState extends State<CalendarScreen> {
     final noon = _formatTimeFromFields(_dayData?['noon_hour'] as int?, _dayData?['noon_minute'] as int?);
     final evening = _formatTimeFromFields(_dayData?['evening_hour'] as int?, _dayData?['evening_minute'] as int?);
 
+    final esp32Morning = _formatTimeFromFields(_dayData?['esp32_morning_hour'] as int?, _dayData?['esp32_morning_minute'] as int?);
+    final esp32Noon = _formatTimeFromFields(_dayData?['esp32_noon_hour'] as int?, _dayData?['esp32_noon_minute'] as int?);
+    final esp32Evening = _formatTimeFromFields(_dayData?['esp32_evening_hour'] as int?, _dayData?['esp32_evening_minute'] as int?);
+
     final items = <Widget>[];
     if (medicine.isNotEmpty) {
       items.add(Card(
@@ -124,7 +128,17 @@ class _CalendarScreenState extends State<CalendarScreen> {
         child: ListTile(
           leading: const Icon(Icons.wb_sunny),
           title: const Text('Buổi sáng'),
-          subtitle: Text('Thời gian: $morning'),
+          subtitle: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('Thời gian: $morning'),
+              if (esp32Morning.isNotEmpty)
+                Text(
+                  'Đã mở hộp thuốc vào lúc $esp32Morning',
+                  style: const TextStyle(color: Colors.green, fontSize: 12),
+                ),
+            ],
+          ),
         ),
       ));
     }
@@ -134,7 +148,17 @@ class _CalendarScreenState extends State<CalendarScreen> {
         child: ListTile(
           leading: const Icon(Icons.wb_sunny_outlined),
           title: const Text('Buổi trưa'),
-          subtitle: Text('Thời gian: $noon'),
+          subtitle: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('Thời gian: $noon'),
+              if (esp32Noon.isNotEmpty)
+                Text(
+                  'Đã mở hộp thuốc vào lúc $esp32Noon',
+                  style: const TextStyle(color: Colors.green, fontSize: 12),
+                ),
+            ],
+          ),
         ),
       ));
     }
@@ -144,7 +168,17 @@ class _CalendarScreenState extends State<CalendarScreen> {
         child: ListTile(
           leading: const Icon(Icons.nightlight_round),
           title: const Text('Buổi tối'),
-          subtitle: Text('Thời gian: $evening'),
+          subtitle: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('Thời gian: $evening'),
+              if (esp32Evening.isNotEmpty)
+                Text(
+                  'Đã mở hộp thuốc vào lúc $esp32Evening',
+                  style: const TextStyle(color: Colors.green, fontSize: 12),
+                ),
+            ],
+          ),
         ),
       ));
     }
