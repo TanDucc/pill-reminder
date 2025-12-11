@@ -4,6 +4,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_database/firebase_database.dart';
 import 'package:firebase_core/firebase_core.dart';
 import '../services/notification_service.dart';
+import '../services/prediction_service.dart';
 
 class AddMedicineScreen extends StatefulWidget {
   const AddMedicineScreen({super.key});
@@ -27,11 +28,14 @@ class _AddMedicineScreenState extends State<AddMedicineScreen> {
     app: Firebase.app(),
     databaseURL: 'https://smart-pillbox-54626-default-rtdb.asia-southeast1.firebasedatabase.app',
   ).ref();
+  double? _riskScore;
+  bool _loadingRisk = false;
 
   @override
   void initState() {
     super.initState();
     _loadTimesForDate(_selectedDate);
+    _fetchRiskScore();
   }
 
   /// 🔹 Hàm tải giờ từ Firestore
@@ -334,6 +338,20 @@ class _AddMedicineScreenState extends State<AddMedicineScreen> {
     }
   }
 
+  Future<void> _fetchRiskScore() async {
+    setState(() { _loadingRisk = true; });
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) {
+      setState(() { _riskScore = null; _loadingRisk = false; });
+      return;
+    }
+    final risk = await PredictionService().runDailyCheck(user.uid);
+    setState(() {
+      _riskScore = risk;
+      _loadingRisk = false;
+    });
+  }
+
   /// 🔹 Định dạng giờ
   String _formatTime(TimeOfDay time) {
     final hour = time.hour.toString().padLeft(2, '0');
@@ -375,6 +393,8 @@ class _AddMedicineScreenState extends State<AddMedicineScreen> {
             style: Theme.of(context).textTheme.headlineSmall,
           ),
           const SizedBox(height: 20),
+
+          // ...existing code...
 
           /// Nhập loại thuốc
           TextField(
@@ -503,6 +523,81 @@ class _AddMedicineScreenState extends State<AddMedicineScreen> {
               ),
             ),
           ),
+          // Hiển thị kết quả dự đoán tỉ lệ bỏ thuốc dưới dạng biểu đồ tròn
+          if (_loadingRisk)
+            const Center(child: CircularProgressIndicator()),
+          if (!_loadingRisk && _riskScore != null)
+            Container(
+              width: double.infinity,
+              margin: const EdgeInsets.only(bottom: 16),
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: _riskScore! > 0.8
+                    ? Colors.red[100]
+                    : _riskScore! > 0.5
+                        ? Colors.yellow[100]
+                        : Colors.green[100],
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: _riskScore! > 0.8
+                      ? Colors.red
+                      : _riskScore! > 0.5
+                          ? Colors.yellow[700]!
+                          : Colors.green,
+                  width: 2,
+                ),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  Text(
+                    'Dự đoán tỉ lệ bỏ thuốc',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.black87,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  SizedBox(
+                    height: 60,
+                    width: 60,
+                    child: CircularProgressIndicator(
+                      value: _riskScore!.clamp(0, 1),
+                      strokeWidth: 8,
+                      backgroundColor: Colors.grey[300],
+                      valueColor: AlwaysStoppedAnimation<Color>(
+                        _riskScore! > 0.8
+                            ? Colors.red
+                            : _riskScore! > 0.5
+                                ? Colors.yellow[700]!
+                                : Colors.green,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    '${(_riskScore! * 100).toStringAsFixed(1)}%',
+                    style: TextStyle(
+                      fontSize: 22,
+                      fontWeight: FontWeight.bold,
+                      color: _riskScore! > 0.8
+                          ? Colors.red
+                          : _riskScore! > 0.5
+                              ? Colors.yellow[700]!
+                              : Colors.green,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  if (_riskScore! > 0.8)
+                    const Text('🔴 Nguy cơ rất cao, hãy chú ý nhắc nhở người bệnh tuân thủ uống thuốc!', style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold)),
+                  if (_riskScore! > 0.5 && _riskScore! <= 0.8)
+                    const Text('🟡 Nguy cơ trung bình, người bệnh cần chú ý hơn!', style: TextStyle(color: Colors.orange, fontWeight: FontWeight.bold)),
+                  if (_riskScore! <= 0.5)
+                    const Text('🟢 Nguy cơ thấp, người bệnh đang tuân thủ tốt!', style: TextStyle(color: Colors.green, fontWeight: FontWeight.bold)),
+                ],
+              ),
+            ),
           const SizedBox(height: 24),
 
           /// Nút lưu
