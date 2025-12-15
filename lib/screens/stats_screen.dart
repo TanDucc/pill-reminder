@@ -1,238 +1,323 @@
+import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:firebase_database/firebase_database.dart';
-
-// Using custom painters instead of fl_chart for compatibility
-class SimpleBarChart extends StatelessWidget {
-  final List<double> values;
-  final List<String> labels;
-  const SimpleBarChart({super.key, required this.values, required this.labels});
-
-  @override
-  Widget build(BuildContext context) {
-    return LayoutBuilder(builder: (context, constraints) {
-      return CustomPaint(
-        size: Size(constraints.maxWidth, constraints.maxHeight),
-        painter: _BarChartPainter(values: values, labels: labels, color: Theme.of(context).colorScheme.primary),
-      );
-    });
-  }
-}
-
-class _BarChartPainter extends CustomPainter {
-  final List<double> values;
-  final List<String> labels;
-  final Color color;
-  _BarChartPainter({required this.values, required this.labels, required this.color});
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final paint = Paint()..color = color;
-    final bg = Paint()..color = Colors.grey.shade200;
-    // draw background
-    canvas.drawRect(Rect.fromLTWH(0, 0, size.width, size.height), bg);
-    // draw background grid
-    final stepY = size.height / 5;
-    final gridPaint = Paint()..color = Colors.grey.withOpacity(0.2);
-    for (int i = 0; i <= 5; i++) {
-      canvas.drawLine(Offset(0, stepY * i), Offset(size.width, stepY * i), gridPaint);
-    }
-
-    if (values.isEmpty) return;
-    final maxY = 100.0;
-    final barWidth = size.width / (values.length * 2 + 1);
-    for (int i = 0; i < values.length; i++) {
-      final x = barWidth * (1 + i * 2);
-      final h = (values[i] / maxY) * (size.height - 20);
-      final rect = Rect.fromLTWH(x, size.height - h - 20, barWidth, h);
-      canvas.drawRRect(RRect.fromRectAndRadius(rect, const Radius.circular(6)), paint);
-      // label
-      final tp = TextPainter(text: TextSpan(text: labels[i].split('-').last, style: const TextStyle(fontSize: 12, color: Colors.black)), textDirection: TextDirection.ltr);
-      tp.layout(maxWidth: barWidth * 2);
-      tp.paint(canvas, Offset(x - (tp.width - barWidth) / 2, size.height - 18));
-    }
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => true;
-}
-
-class SimplePieChart extends StatelessWidget {
-  final double percent; // 0-100
-  final Color color;
-  const SimplePieChart({super.key, required this.percent, required this.color});
-
-  @override
-  Widget build(BuildContext context) {
-    return CustomPaint(
-      size: const Size(140, 140),
-      painter: _PieChartPainter(percent: percent, color: color),
-    );
-  }
-}
-
-class _PieChartPainter extends CustomPainter {
-  final double percent;
-  final Color color;
-  _PieChartPainter({required this.percent, required this.color});
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final rect = Offset.zero & size;
-    final paintBg = Paint()..color = Colors.grey.shade300;
-    final paint = Paint()..color = color;
-    final center = rect.center;
-    final radius = size.width / 2;
-    canvas.drawCircle(center, radius, paintBg);
-    final sweep = (percent / 100) * 2 * 3.141592653589793;
-    canvas.drawArc(Rect.fromCircle(center: center, radius: radius), -3.141592653589793 / 2, sweep, true, paint);
-    // inner circle
-    final inner = Paint()..color = Colors.white;
-    canvas.drawCircle(center, radius * 0.5, inner);
-    // text
-    final tp = TextPainter(text: TextSpan(text: '${percent.toStringAsFixed(0)}%', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.black)), textDirection: TextDirection.ltr);
-    tp.layout();
-    tp.paint(canvas, Offset(center.dx - tp.width / 2, center.dy - tp.height / 2));
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => true;
-}
+import 'package:intl/intl.dart';
 
 class StatsScreen extends StatefulWidget {
   final ValueNotifier<int>? selectedIndexNotifier;
 
-  const StatsScreen({required this.selectedIndexNotifier, super.key});
+  const StatsScreen({this.selectedIndexNotifier, super.key});
 
   @override
   State<StatsScreen> createState() => _StatsScreenState();
 }
 
 class _StatsScreenState extends State<StatsScreen> {
-  Map<String, double> _weekData = {}; // date -> compliance percent (0-100)
-  bool _loading = true;
+  bool _isLoading = true;
+  
+  // Dữ liệu cho biểu đồ
+  List<double> _weeklyRisks = List.filled(7, 0.0);
+  List<String> _dateLabels = List.filled(7, "");
+  double _averageRisk = 0.0;
 
   @override
   void initState() {
     super.initState();
-    // show mock data immediately so UI doesn't spin when no real data exists
-    _setMockData();
-    // fetch real data in background and update when available
-    _loadWeekData();
+    _fetchWeeklyData();
   }
 
-  Future<void> _loadWeekData() async {
-    setState(() {
-      _loading = true;
-    });
-
+  // Hàm lấy dữ liệu từ Firestore
+  Future<void> _fetchWeeklyData() async {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) {
-      // fall back to mock data
-      _setMockData();
+      setState(() => _isLoading = false);
       return;
     }
 
-    try {
-      final now = DateTime.now();
-      // build 7-day keys yyyy-MM-dd
-      final keys = List.generate(7, (i) => DateTime(now.year, now.month, now.day).subtract(Duration(days: i)));
-      final db = FirebaseDatabase.instance.ref();
-      final Map<String, double> tmp = {};
-      for (final d in keys.reversed) {
-        final key = d.toIso8601String().substring(0, 10);
-        final snap = await db.child('compliance').child(user.uid).child('week').child(key).get();
-        if (snap.exists) {
-          final val = snap.value;
-          double percent = 0;
-          if (val is num) percent = (val as num).toDouble();
-          else if (val is Map && val['percent'] is num) percent = (val['percent'] as num).toDouble();
-          tmp[key] = percent.clamp(0, 100);
-        } else {
-          tmp[key] = 0;
-        }
-      }
-      setState(() {
-        _weekData = tmp;
-      });
-    } catch (e) {
-      // fallback
-      _setMockData();
-    } finally {
-      setState(() {
-        _loading = false;
-      });
-    }
-  }
+    List<double> risks = [];
+    List<String> labels = [];
+    double totalRisk = 0;
+    int count = 0;
 
-  void _setMockData() {
-    final now = DateTime.now();
-    final Map<String, double> tmp = {};
+    DateTime now = DateTime.now();
+
+    // Lặp 7 ngày: Từ 6 ngày trước -> Hôm nay
     for (int i = 6; i >= 0; i--) {
-      final d = now.subtract(Duration(days: i));
-      tmp[d.toIso8601String().substring(0, 10)] = (50 + (i * 5)) % 100 + 10; // some mock
+      DateTime date = now.subtract(Duration(days: i));
+      String dateStr = DateFormat('yyyy-MM-dd').format(date);
+      String label = DateFormat('dd/MM').format(date); 
+
+      labels.add(label);
+
+      try {
+        DocumentSnapshot doc = await FirebaseFirestore.instance
+            .collection('medicine_times')
+            .doc(user.uid)
+            .collection('days')
+            .doc(dateStr)
+            .get();
+
+        if (doc.exists) {
+          Map<String, dynamic> data = doc.data() as Map<String, dynamic>;
+          double risk = (data['prediction_risk'] ?? 0.0).toDouble();
+          
+          risks.add(risk * 100); 
+          
+          if (data.containsKey('prediction_risk')) {
+             totalRisk += risk;
+             count++;
+          }
+        } else {
+          risks.add(0.0); 
+        }
+      } catch (e) {
+        print("Lỗi lấy data ngày $dateStr: $e");
+        risks.add(0.0);
+      }
     }
-    setState(() {
-      _weekData = tmp;
-      // keep loading flag as-is; UI will show mock immediately regardless
-    });
+
+    // Tính trung bình
+    double avg = (count > 0) ? (totalRisk / count) * 100 : 0.0;
+
+    if (mounted) {
+      setState(() {
+        _weeklyRisks = risks;
+        _dateLabels = labels;
+        _averageRisk = avg;
+        _isLoading = false;
+      });
+    }
   }
 
   @override
   Widget build(BuildContext context) {
-    // Always render charts immediately (with mock data if real data hasn't loaded yet)
-    final labels = _weekData.keys.toList();
-    final values = _weekData.values.toList();
-    final totalAvg = values.isNotEmpty ? (values.reduce((a, b) => a + b) / values.length) : 0.0;
-
     return Scaffold(
-      body: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            const Text('Thống kê tuân thủ (7 ngày gần nhất)', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-            const SizedBox(height: 12),
-            Expanded(
-              flex: 2,
-              child: Card(
-                child: Padding(
-                  padding: const EdgeInsets.all(8.0),
-                  child: SimpleBarChart(values: values, labels: labels),
-                ),
-              ),
-            ),
-            const SizedBox(height: 12),
-            Expanded(
-              flex: 1,
-              child: Card(
-                child: Padding(
-                  padding: const EdgeInsets.all(8.0),
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const Text('Tỷ lệ tuân thủ trung bình', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-                            const SizedBox(height: 8),
-                            Text('${totalAvg.toStringAsFixed(1)}%'),
-                          ],
-                        ),
-                      ),
-                      SizedBox(
-                        width: 140,
-                        height: 140,
-                        child: SimplePieChart(percent: totalAvg, color: Theme.of(context).colorScheme.primary),
-                      ),
-                    ],
+      appBar: AppBar(title: const Text("Thống kê & Biểu đồ")),
+      body: _isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : SingleChildScrollView(
+              padding: const EdgeInsets.all(16.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  // --- TIÊU ĐỀ BIỂU ĐỒ CỘT ---
+                  const Text(
+                    "Tỉ lệ rủi ro bỏ thuốc (7 ngày qua)",
+                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                   ),
-                ),
+                  const SizedBox(height: 20),
+                  
+                  // --- WIDGET BIỂU ĐỒ CỘT ---
+                  Card(
+                    elevation: 4,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    child: Padding(
+                      padding: const EdgeInsets.all(16.0),
+                      child: AspectRatio(
+                        aspectRatio: 1.5,
+                        child: _buildBarChart(),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 30),
+
+                  // --- TIÊU ĐỀ BIỂU ĐỒ TRÒN ---
+                  const Text(
+                    "Trung bình mức độ rủi ro",
+                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                  ),
+                  const SizedBox(height: 10),
+
+                  // --- WIDGET BIỂU ĐỒ TRÒN (ĐÃ CẬP NHẬT) ---
+                  Card(
+                    elevation: 4,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 16.0, horizontal: 12.0),
+                      child: Row(
+                        children: [
+                          // 1. Biểu đồ (Bên trái)
+                          Expanded(
+                            flex: 4, // Tỉ lệ 4
+                            child: SizedBox(
+                              height: 180,
+                              child: _buildPieChart(),
+                            ),
+                          ),
+                          
+                          // Khoảng cách giữa biểu đồ và chữ
+                          const SizedBox(width: 24),
+
+                          // 2. Thông tin chi tiết (Bên phải)
+                          Expanded(
+                            flex: 5, // Tỉ lệ 5 (Rộng hơn để chứa chữ)
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                // Nguy cơ
+                                _legendItem(
+                                  Colors.redAccent, 
+                                  "Nguy cơ: ${_averageRisk.toStringAsFixed(1)}%"
+                                ),
+                                const SizedBox(height: 12),
+                                
+                                // Tuân thủ (100 - nguy cơ)
+                                _legendItem(
+                                  Colors.green, 
+                                  "Tuân thủ: ${(100 - _averageRisk).toStringAsFixed(1)}%"
+                                ),
+                                
+                                const SizedBox(height: 20),
+                                Text(
+                                  "TB Rủi ro: ${_averageRisk.toStringAsFixed(1)}%",
+                                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+                                )
+                              ],
+                            ),
+                          )
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ),
-          ],
+    );
+  }
+
+  // Helper vẽ Biểu đồ cột
+  Widget _buildBarChart() {
+    return BarChart(
+      BarChartData(
+        alignment: BarChartAlignment.spaceAround,
+        maxY: 100,
+        barTouchData: BarTouchData(
+          enabled: true,
+          touchTooltipData: BarTouchTooltipData(
+            tooltipBgColor: Colors.blueGrey, // Giữ nguyên fix lỗi version cũ
+            getTooltipItem: (group, groupIndex, rod, rodIndex) {
+              return BarTooltipItem(
+                '${rod.toY.round()}%',
+                const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+              );
+            },
+          ),
         ),
+        titlesData: FlTitlesData(
+          show: true,
+          bottomTitles: AxisTitles(
+            sideTitles: SideTitles(
+              showTitles: true,
+              getTitlesWidget: (double value, TitleMeta meta) {
+                int index = value.toInt();
+                if (index >= 0 && index < _dateLabels.length) {
+                  return Padding(
+                    padding: const EdgeInsets.only(top: 8.0),
+                    child: Text(
+                      _dateLabels[index],
+                      style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold),
+                    ),
+                  );
+                }
+                return const Text('');
+              },
+            ),
+          ),
+          leftTitles: AxisTitles(
+            sideTitles: SideTitles(
+              showTitles: true,
+              reservedSize: 30,
+              interval: 20,
+              getTitlesWidget: (value, meta) {
+                return Text('${value.toInt()}', style: const TextStyle(fontSize: 10));
+              },
+            ),
+          ),
+          topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+          rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+        ),
+        borderData: FlBorderData(show: false),
+        gridData: const FlGridData(show: true, drawVerticalLine: false),
+        barGroups: _weeklyRisks.asMap().entries.map((entry) {
+          int index = entry.key;
+          double value = entry.value;
+          
+          Color barColor = value > 50 ? Colors.redAccent : Colors.green;
+
+          return BarChartGroupData(
+            x: index,
+            barRods: [
+              BarChartRodData(
+                toY: value,
+                color: barColor,
+                width: 16,
+                borderRadius: const BorderRadius.only(
+                  topLeft: Radius.circular(4), 
+                  topRight: Radius.circular(4)
+                ),
+                backDrawRodData: BackgroundBarChartRodData(
+                    show: true,
+                    toY: 100, 
+                    color: Colors.grey.shade100,
+                 )
+              ),
+            ],
+          );
+        }).toList(),
       ),
+    );
+  }
+
+  // Helper vẽ Biểu đồ tròn
+  Widget _buildPieChart() {
+    return Stack(
+      alignment: Alignment.center,
+      children: [
+        PieChart(
+          PieChartData(
+            sectionsSpace: 2,
+            centerSpaceRadius: 40,
+            sections: [
+              // Phần rủi ro
+              PieChartSectionData(
+                value: _averageRisk,
+                title: '${_averageRisk.toStringAsFixed(0)}%',
+                color: Colors.redAccent,
+                radius: 50,
+                titleStyle: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.white),
+              ),
+              // Phần an toàn
+              PieChartSectionData(
+                value: 100 - _averageRisk,
+                title: '',
+                color: Colors.green.shade400,
+                radius: 40,
+              ),
+            ],
+          ),
+        ),
+        const Text("TB", style: TextStyle(fontWeight: FontWeight.bold, color: Colors.grey)),
+      ],
+    );
+  }
+
+  // Helper vẽ chú thích
+  Widget _legendItem(Color color, String text) {
+    return Row(
+      children: [
+        Container(width: 12, height: 12, color: color),
+        const SizedBox(width: 8),
+        // Flexible giúp text tự xuống dòng nếu quá dài
+        Flexible(
+          child: Text(
+            text, 
+            style: const TextStyle(fontSize: 12),
+            overflow: TextOverflow.visible,
+          ),
+        ),
+      ],
     );
   }
 }

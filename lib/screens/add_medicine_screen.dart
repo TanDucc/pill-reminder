@@ -551,7 +551,7 @@ class _AddMedicineScreenState extends State<AddMedicineScreen> {
                 crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
                   Text(
-                    'Dự đoán tỉ lệ bỏ thuốc',
+                    'Dự đoán tỉ lệ bỏ/quên thuốc',
                     style: TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.w600,
