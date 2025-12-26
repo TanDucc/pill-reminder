@@ -209,7 +209,24 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             children: [
                               const Icon(Icons.verified_user, color: Colors.teal),
                               const SizedBox(width: 8),
-                              Text(FirebaseAuth.instance.currentUser?.uid ?? '', style: const TextStyle(fontSize: 16)),
+                              // Truncate UID if too long
+                              Flexible(
+                                child: Builder(
+                                  builder: (context) {
+                                    final uid = FirebaseAuth.instance.currentUser?.uid ?? '';
+                                    const maxLen = 20;
+                                    String displayUid = uid;
+                                    if (uid.length > maxLen) {
+                                      displayUid = uid.substring(0, maxLen) + '...';
+                                    }
+                                    return Text(
+                                      displayUid,
+                                      style: const TextStyle(fontSize: 16),
+                                      overflow: TextOverflow.ellipsis,
+                                    );
+                                  },
+                                ),
+                              ),
                             ],
                           ),
                         ],

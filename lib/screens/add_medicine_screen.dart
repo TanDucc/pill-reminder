@@ -3,6 +3,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_database/firebase_database.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:intl/intl.dart';
 import '../services/notification_service.dart';
 import '../services/prediction_service.dart';
 
@@ -23,12 +24,14 @@ class _AddMedicineScreenState extends State<AddMedicineScreen> {
   DateTime _selectedDate = DateTime.now();
   final TextEditingController _medicineController = TextEditingController();
   final TextEditingController _diseaseController = TextEditingController();
-  bool _applyToWeek = false; // ...new: whether to apply times for 1 week
+  bool _applyToWeek = false; 
   final DatabaseReference _rtdb = FirebaseDatabase.instanceFor(
     app: Firebase.app(),
     databaseURL: 'https://smart-pillbox-54626-default-rtdb.asia-southeast1.firebasedatabase.app',
   ).ref();
+  
   double? _riskScore;
+  double? _optimalTimeDiff; // [MỚI] Biến lưu thời gian đề xuất
   bool _loadingRisk = false;
 
   @override
@@ -74,6 +77,18 @@ class _AddMedicineScreenState extends State<AddMedicineScreen> {
         _esp32EveningTime = (data['esp32_evening_hour'] != null && data['esp32_evening_minute'] != null)
             ? TimeOfDay(hour: data['esp32_evening_hour'], minute: data['esp32_evening_minute'])
             : null;
+
+        // [MỚI] Load thêm dữ liệu AI nếu đã lưu
+        if (data.containsKey('prediction_risk')) {
+          _riskScore = (data['prediction_risk'] as num).toDouble();
+        } else {
+          _riskScore = null;
+        }
+        if (data.containsKey('optimal_time_diff')) {
+          _optimalTimeDiff = (data['optimal_time_diff'] as num).toDouble();
+        } else {
+          _optimalTimeDiff = null;
+        }
       });
     } else {
       _medicineController.text = '';
@@ -85,6 +100,8 @@ class _AddMedicineScreenState extends State<AddMedicineScreen> {
         _esp32MorningTime = null;
         _esp32NoonTime = null;
         _esp32EveningTime = null;
+        _riskScore = null;
+        _optimalTimeDiff = null;
       });
     }
   }
@@ -94,10 +111,7 @@ class _AddMedicineScreenState extends State<AddMedicineScreen> {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) return;
 
-    // Log UID for debugging and prepare the data payload (same structure for Firestore & RTDB)
     final uid = user.uid;
-    // helpful debug - will appear in console
-    // ignore: avoid_print
     print('Attempting to save medicine times for uid: $uid');
 
     // Fetch user data from Firestore
@@ -129,7 +143,6 @@ class _AddMedicineScreenState extends State<AddMedicineScreen> {
         };
       }
     } catch (e) {
-      // ignore: avoid_print
       print('Error fetching user data: $e');
       userData = {
         'user_name': user.displayName ?? '',
@@ -139,7 +152,7 @@ class _AddMedicineScreenState extends State<AddMedicineScreen> {
       };
     }
 
-    // Prepare the data payload (same structure for Firestore & RTDB)
+    // Prepare the data payload
     Map<String, dynamic> makePayload(DateTime day) => {
           'medicine': _medicineController.text.trim(),
           'disease': _diseaseController.text.trim(),
@@ -152,6 +165,9 @@ class _AddMedicineScreenState extends State<AddMedicineScreen> {
           'date': day.toIso8601String().substring(0, 10),
           'createdAt': ServerValue.timestamp,
           ...userData,
+          // [MỚI] Giữ lại dữ liệu AI khi lưu để không bị mất
+          if (_riskScore != null) 'prediction_risk': _riskScore,
+          if (_optimalTimeDiff != null) 'optimal_time_diff': _optimalTimeDiff,
         };
 
     bool firestoreOk = true;
@@ -162,7 +178,7 @@ class _AddMedicineScreenState extends State<AddMedicineScreen> {
     try {
       if (_applyToWeek) {
         final batch = FirebaseFirestore.instance.batch();
-        final Map<String, Object?> updates = {}; // for RTDB multi-path update
+        final Map<String, Object?> updates = {}; 
         for (int i = 0; i < 7; i++) {
           final day = _selectedDate.add(Duration(days: i));
           final dayId = day.toIso8601String().substring(0, 10);
@@ -173,32 +189,28 @@ class _AddMedicineScreenState extends State<AddMedicineScreen> {
               .doc(dayId);
 
           final payload = makePayload(day);
-          // Firestore batch
+          
           batch.set(docRef, {
             ...payload,
             'createdAt': FieldValue.serverTimestamp(),
             'appliedWeek': true,
-          });
-          // RTDB multi-path (path: /medicine_times/{uid}/days/{date})
+          }, SetOptions(merge: true));
+          
           updates['/medicine_times/$uid/days/$dayId'] = payload;
         }
 
-        // Try Firestore commit
         try {
           await batch.commit();
         } on FirebaseException catch (e) {
           firestoreOk = false;
           firestoreErr = '${e.code} - ${e.message}';
-          // ignore: avoid_print
           print('Firestore batch commit failed: $firestoreErr');
         } catch (e) {
           firestoreOk = false;
           firestoreErr = e.toString();
-          // ignore: avoid_print
           print('Unexpected Firestore error: $firestoreErr');
         }
 
-        // Try RTDB update regardless of Firestore result
         try {
           if (updates.isNotEmpty) {
             await _rtdb.update(updates);
@@ -206,16 +218,14 @@ class _AddMedicineScreenState extends State<AddMedicineScreen> {
         } on FirebaseException catch (e) {
           rtdbOk = false;
           rtdbErr = '${e.code} - ${e.message}';
-          // ignore: avoid_print
           print('RTDB update failed: $rtdbErr');
         } catch (e) {
           rtdbOk = false;
           rtdbErr = e.toString();
-          // ignore: avoid_print
           print('Unexpected RTDB error: $rtdbErr');
         }
 
-        // Đặt lịch thông báo cho từng ngày trong 7 ngày
+        // Đặt lịch thông báo
         for (int i = 0; i < 7; i++) {
           final day = _selectedDate.add(Duration(days: i));
           final dayId = day.toIso8601String().substring(0, 10);
@@ -230,17 +240,9 @@ class _AddMedicineScreenState extends State<AddMedicineScreen> {
             final nowDateId = DateTime.now().toIso8601String().substring(0, 10);
             if (dayId.compareTo(nowDateId) >= 0) {
               print('--- Đặt lịch thông báo cho ngày $dayId ---');
-              print('Loại thuốc: ${data['medicine'] ?? ''}');
-              print('Sáng: ${data['morning_hour'] ?? '--'}:${data['morning_minute'] ?? '--'}');
-              print('Trưa: ${data['noon_hour'] ?? '--'}:${data['noon_minute'] ?? '--'}');
-              print('Tối: ${data['evening_hour'] ?? '--'}:${data['evening_minute'] ?? '--'}');
               await NotificationService().scheduleTodaysNotifications(uid: uid);
               print('✅ Đã xếp lịch thông báo cho ngày $dayId');
-            } else {
-              print('⏩ Bỏ qua ngày $dayId (trước hôm nay)');
             }
-          } else {
-            print('❌ Không tìm thấy dữ liệu cho ngày $dayId');
           }
         }
       } else {
@@ -253,25 +255,21 @@ class _AddMedicineScreenState extends State<AddMedicineScreen> {
 
         final payload = makePayload(_selectedDate);
 
-        // Firestore write
         try {
           await docRef.set({
             ...payload,
             'createdAt': FieldValue.serverTimestamp(),
-          });
+          }, SetOptions(merge: true));
         } on FirebaseException catch (e) {
           firestoreOk = false;
           firestoreErr = '${e.code} - ${e.message}';
-          // ignore: avoid_print
           print('Firestore set failed: $firestoreErr');
         } catch (e) {
           firestoreOk = false;
           firestoreErr = e.toString();
-          // ignore: avoid_print
           print('Unexpected Firestore error: $firestoreErr');
         }
 
-        // RTDB write
         try {
           await _rtdb
               .child('medicine_times/$uid/days/$dayId')
@@ -279,33 +277,26 @@ class _AddMedicineScreenState extends State<AddMedicineScreen> {
         } on FirebaseException catch (e) {
           rtdbOk = false;
           rtdbErr = '${e.code} - ${e.message}';
-          // ignore: avoid_print
           print('RTDB set failed: $rtdbErr');
         } catch (e) {
           rtdbOk = false;
           rtdbErr = e.toString();
-          // ignore: avoid_print
           print('Unexpected RTDB error: $rtdbErr');
         }
       }
 
-      // Summarize results to user
       if (firestoreOk && rtdbOk) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text(_applyToWeek ? '✅ Đã lưu giờ uống thuốc cho 1 tuần!' : '✅ Đã lưu giờ uống thuốc!')),
         );
-        // Schedule notifications if today
         if (_selectedDate.toIso8601String().substring(0, 10) == DateTime.now().toIso8601String().substring(0, 10)) {
           print('📅 Selected date is today, scheduling notifications...');
           await NotificationService().scheduleTodaysNotifications();
-        } else {
-          print('🚫 Selected date is not today, skipping notification schedule');
         }
       } else if (!firestoreOk && rtdbOk) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('⚠️ Firestore failed, but saved to Realtime DB.\nFirestore error: $firestoreErr')),
         );
-        // Schedule notifications if today
         if (_selectedDate.toIso8601String().substring(0, 10) == DateTime.now().toIso8601String().substring(0, 10)) {
           await NotificationService().scheduleTodaysNotifications();
         }
@@ -313,7 +304,6 @@ class _AddMedicineScreenState extends State<AddMedicineScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('⚠️ Saved to Firestore, but Realtime DB failed.\nRTDB error: $rtdbErr')),
         );
-        // Schedule notifications if today
         if (_selectedDate.toIso8601String().substring(0, 10) == DateTime.now().toIso8601String().substring(0, 10)) {
           await NotificationService().scheduleTodaysNotifications();
         }
@@ -323,14 +313,11 @@ class _AddMedicineScreenState extends State<AddMedicineScreen> {
         );
       }
     } on FirebaseException catch (e) {
-      // Log and show helpful message
-      // ignore: avoid_print
       print('FirebaseException while saving times: ${e.code} - ${e.message}');
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Lỗi khi lưu: ${e.code} - ${e.message}\nKiểm tra Firestore rules và quyền truy cập.')),
       );
     } catch (e) {
-      // ignore: avoid_print
       print('Unexpected error while saving times: $e');
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Đã xảy ra lỗi không xác định khi lưu dữ liệu.')),
@@ -342,12 +329,36 @@ class _AddMedicineScreenState extends State<AddMedicineScreen> {
     setState(() { _loadingRisk = true; });
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) {
-      setState(() { _riskScore = null; _loadingRisk = false; });
+      setState(() { _riskScore = null; _optimalTimeDiff = null; _loadingRisk = false; });
       return;
     }
+    
+    // Gọi API (Service đã tự lưu kết quả vào Firestore)
     final risk = await PredictionService().runDailyCheck(user.uid);
+    
+    // [MỚI] Đọc lại optimal_time_diff từ Firestore để hiển thị
+    double? optimalDiff;
+    try {
+      String dateStr = _selectedDate.toIso8601String().substring(0, 10);
+      final doc = await FirebaseFirestore.instance
+            .collection('medicine_times')
+            .doc(user.uid)
+            .collection('days')
+            .doc(dateStr)
+            .get();
+      if (doc.exists) {
+         final data = doc.data() as Map<String, dynamic>;
+         if (data.containsKey('optimal_time_diff')) {
+            optimalDiff = (data['optimal_time_diff'] as num).toDouble();
+         }
+      }
+    } catch (e) {
+      print("Lỗi đọc optimal time: $e");
+    }
+
     setState(() {
       _riskScore = risk;
+      _optimalTimeDiff = optimalDiff;
       _loadingRisk = false;
     });
   }
@@ -381,6 +392,52 @@ class _AddMedicineScreenState extends State<AddMedicineScreen> {
     );
   }
 
+  // [MỚI] Widget hiển thị đề xuất thời gian
+  Widget _buildOptimizationInfo() {
+    if (_optimalTimeDiff == null) return const SizedBox.shrink();
+
+    String message = "";
+    IconData icon = Icons.check_circle;
+    Color color = Colors.green[800]!;
+    
+    double val = double.parse(_optimalTimeDiff!.toStringAsFixed(1));
+
+    if (val < -5) {
+      message = "Đề xuất: Uống SỚM HƠN ${val.abs()} phút";
+      icon = Icons.history; 
+      color = Colors.orange[900]!;
+    } else if (val > 5) {
+      message = "Đề xuất: Uống MUỘN HƠN $val phút";
+      icon = Icons.update;
+      color = Colors.blue[900]!;
+    } else {
+      message = "Thời gian uống thuốc hiện tại khá tốt.";
+      icon = Icons.thumb_up;
+      color = Colors.green[900]!;
+    }
+
+    return Column(
+      children: [
+        const Divider(color: Colors.black26, height: 20, thickness: 1),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(icon, size: 20, color: color),
+            const SizedBox(width: 8),
+            Text(
+              message,
+              style: TextStyle(
+                fontSize: 15,
+                fontWeight: FontWeight.bold,
+                color: color,
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return SingleChildScrollView(
@@ -393,8 +450,6 @@ class _AddMedicineScreenState extends State<AddMedicineScreen> {
             style: Theme.of(context).textTheme.headlineSmall,
           ),
           const SizedBox(height: 20),
-
-          // ...existing code...
 
           /// Nhập loại thuốc
           TextField(
@@ -439,7 +494,7 @@ class _AddMedicineScreenState extends State<AddMedicineScreen> {
             ],
           ),
 
-          // ...new: switch to apply times to 1 week
+          // Switch áp dụng cho 1 tuần
           SwitchListTile(
             title: const Text('Áp dụng cho 1 tuần'),
             subtitle: const Text('Lưu cùng một lịch cho 7 ngày liên tiếp, bắt đầu từ ngày đã chọn'),
@@ -523,7 +578,8 @@ class _AddMedicineScreenState extends State<AddMedicineScreen> {
               ),
             ),
           ),
-          // Hiển thị kết quả dự đoán tỉ lệ bỏ thuốc dưới dạng biểu đồ tròn
+          
+          // Hiển thị kết quả dự đoán tỉ lệ bỏ thuốc & Đề xuất tối ưu
           if (_loadingRisk)
             const Center(child: CircularProgressIndicator()),
           if (!_loadingRisk && _riskScore != null)
@@ -595,6 +651,9 @@ class _AddMedicineScreenState extends State<AddMedicineScreen> {
                     const Text('🟡 Nguy cơ trung bình, người bệnh cần chú ý hơn!', style: TextStyle(color: Colors.orange, fontWeight: FontWeight.bold)),
                   if (_riskScore! <= 0.5)
                     const Text('🟢 Nguy cơ thấp, người bệnh đang tuân thủ tốt!', style: TextStyle(color: Colors.green, fontWeight: FontWeight.bold)),
+                  
+                  // [MỚI] Hiển thị đề xuất thời gian ngay bên dưới
+                  _buildOptimizationInfo(),
                 ],
               ),
             ),
@@ -629,34 +688,6 @@ class _AddMedicineScreenState extends State<AddMedicineScreen> {
               ),
             ),
           ),
-
-          /* /// Nút test thông báo ngay lập tức
-          ElevatedButton(
-            onPressed: () async {
-              await NotificationService().showImmediateTestNotification(message: 'Đây là thông báo TEST tức thì!');
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Đã gửi thông báo ngay lập tức!')),
-              );
-            },
-            style: ElevatedButton.styleFrom(
-              minimumSize: const Size.fromHeight(48),
-            ),
-            child: const Text('📢 Test thông báo NGAY'),
-          ),
-          */ const SizedBox(height: 8),
-          /* /// Nút test thông báo
-          ElevatedButton(
-            onPressed: () async {
-              await NotificationService().scheduleTestNotification(message: 'Đây là thông báo test để kiểm tra thông báo hoạt động!');
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Đã lập lịch thông báo test trong 2 phút!')),
-              );
-            },
-            style: ElevatedButton.styleFrom(
-              minimumSize: const Size.fromHeight(48),
-            ),
-            child: const Text('🔔 Test thông báo trong 2 phút'),
-          ), */
         ],
       ),
     );

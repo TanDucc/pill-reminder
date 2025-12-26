@@ -35,42 +35,47 @@ class _WifiConfigScreenState extends State<WifiConfigScreen> {
 
     setState(() => _isLoading = true);
 
+
     try {
       // 3. Chuẩn bị dữ liệu JSON
-      // Lưu ý: Các Key "ssid", "pass", "uid" phải khớp với code trên ESP32
       final Map<String, dynamic> data = {
         'ssid': _ssidController.text.trim(),
-        'pass': _passwordController.text.trim(), // Đổi key thành 'pass' cho gọn
-        'uid': user.uid, // [QUAN TRỌNG] Gửi kèm User ID để ESP32 lưu lại
+        'pass': _passwordController.text.trim(),
+        'uid': user.uid,
       };
 
-      print("Đang gửi cấu hình: $data");
+      print("[DEBUG] Đang gửi cấu hình WiFi:");
+      print("[DEBUG] Dữ liệu gửi đi: $data");
 
       // 4. Gửi Request tới ESP32 (IP mặc định AP là 192.168.4.1)
-      final uri = Uri.parse('http://192.168.4.1/config');
-      
+      final uri = Uri.parse('http://192.168.4.1/save');
+      print("[DEBUG] Gửi POST tới: $uri");
       final response = await http.post(
         uri,
         headers: {
-          "Content-Type": "application/json", // Báo cho ESP biết đây là JSON
+          "Content-Type": "application/json",
         },
-        body: jsonEncode(data), // Chuyển Map sang chuỗi JSON
-      ).timeout(const Duration(seconds: 10)); // Tăng timeout lên xíu cho chắc
+        body: jsonEncode(data),
+      ).timeout(const Duration(seconds: 10));
+
+      print("[DEBUG] Mã trạng thái trả về: ${response.statusCode}");
+      print("[DEBUG] Nội dung trả về: ${response.body}");
 
       if (response.statusCode == 200) {
         if (!mounted) return;
+        print("[DEBUG] Gửi cấu hình thành công!");
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('✅ Gửi cấu hình thành công! ESP32 đang khởi động lại...')),
         );
-        // Có thể pop màn hình này ra sau khi thành công
-        // Navigator.pop(context); 
       } else {
         if (!mounted) return;
+        print("[DEBUG] Lỗi từ ESP32: ${response.statusCode} - ${response.body}");
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('❌ Lỗi từ ESP32 (${response.statusCode}): ${response.body}')),
         );
       }
     } catch (e) {
+      print("[DEBUG] Lỗi gửi cấu hình: $e");
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('⚠️ Không kết nối được với ESP32. Hãy chắc chắn bạn đã kết nối vào Wifi của hộp thuốc!\nLỗi: $e')),

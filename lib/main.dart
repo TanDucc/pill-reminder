@@ -11,10 +11,33 @@ import 'screens/splash_screen.dart';
 import 'screens/wifi_config_screen.dart';
 import 'screens/stats_screen.dart';
 import 'services/notification_service.dart';
+import 'services/background_service.dart';
+import 'package:workmanager/workmanager.dart'; // <--- QUAN TRỌNG
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp();
+
+  Workmanager().initialize(
+    callbackDispatcher,
+    isInDebugMode: true // Để true khi test để thấy log, khi release sửa thành false
+  );
+
+  // --- [MỚI] ĐĂNG KÝ TASK CHẠY ĐỊNH KỲ ---
+  // Hủy task cũ (nếu có) để tránh trùng lặp
+  await Workmanager().cancelAll(); 
+
+  // Đăng ký task mới: Chạy mỗi 4 giờ (tần suất tối thiểu của Android là 15 phút)
+  // Hệ điều hành sẽ tự chọn thời điểm thích hợp để chạy (ví dụ khi có wifi, pin đầy)
+  Workmanager().registerPeriodicTask(
+    "daily_check_id_unique", // Mã định danh duy nhất
+    taskDailyCheck,          // Tên task (khớp với bên background_service)
+    frequency: const Duration(hours: 8), // Cứ 8 tiếng kiểm tra 1 lần
+    constraints: Constraints(
+      networkType: NetworkType.connected, // Yêu cầu có mạng mới chạy
+    ),
+    existingWorkPolicy: ExistingWorkPolicy.keep, // Nếu đã đăng ký rồi thì giữ nguyên
+  );
 
   // Initialize timezone
   tz.initializeTimeZones();
